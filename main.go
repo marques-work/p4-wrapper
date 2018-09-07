@@ -170,7 +170,7 @@ func main() {
 
 	cwd, _ := os.Getwd()
 
-	extended := fmt.Sprintf(lineEndings(TEMPLATE), start.Format(time.RFC3339), strings.Join(args, " "), cwd, strings.Join(p4Envs(), "\n"), out, duration)
+	extended := fmt.Sprintf(lineEndings(TEMPLATE), start.Format(time.RFC3339), strings.Join(args, " "), cwd, lineEndings(strings.Join(p4Envs(), "\n")), out, duration)
 	writeToLog(logPath, extended)
 
 	if prefs.MaxLines > 0 {
