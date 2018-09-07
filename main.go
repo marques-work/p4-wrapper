@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -20,16 +22,71 @@ const TEMPLATE = `
 Time: %s
 Executing: p4 %s
 
+CWD: %s
+
 P4 Environment:
 
 %s
 
-Output:
+Full Output:
 
 %s
 
 Exec Time: %d ms
 `
+
+type Prefs struct {
+	P4Path   string `json:"p4Path"`
+	LogDir   string `json:"logDir"`
+	MaxLines int    `json:"maxLines"`
+}
+
+func defaults() *Prefs {
+	var P4Path string
+	var LogDir string
+
+	if runtime.GOOS == "windows" {
+		P4Path = RealP4Win
+		LogDir = "C:\\tmp"
+	} else {
+		P4Path = RealP4Nix
+		LogDir = "/tmp"
+	}
+
+	return &Prefs{P4Path: P4Path, LogDir: LogDir, MaxLines: -1}
+}
+
+func readPrefs() *Prefs {
+	prefsFilePath := filepath.Join(thisDir(), "p4-wrapper.json")
+	def := defaults()
+
+	if _, err := os.Stat(prefsFilePath); os.IsNotExist(err) {
+		return def
+	}
+
+	if data, err := ioutil.ReadFile(prefsFilePath); err == nil {
+		var prefs *Prefs
+		json.Unmarshal(data, &prefs)
+
+		if strings.TrimSpace(prefs.P4Path) == "" {
+			prefs.P4Path = def.P4Path
+		}
+
+		if strings.TrimSpace(prefs.LogDir) == "" {
+			prefs.LogDir = def.LogDir
+		}
+
+		if prefs.MaxLines == 0 {
+			prefs.MaxLines = def.MaxLines
+		}
+
+		return prefs
+	} else {
+		log.Fatal(err)
+	}
+
+	return def
+}
 
 func sel(strs []string, test func(string) bool) (ret []string) {
 	for _, s := range strs {
@@ -46,14 +103,6 @@ func p4Envs() []string {
 	return sel(os.Environ(), func(s string) bool {
 		return re.MatchString(s)
 	})
-}
-
-func realP4() string {
-	if runtime.GOOS == "windows" {
-		return RealP4Win
-	} else {
-		return RealP4Nix
-	}
 }
 
 func thisDir() string {
@@ -89,13 +138,19 @@ func writeToLog(filename, text string) {
 }
 
 func main() {
-	logPath := filepath.Join(thisDir(), "p4-debug.log")
+	prefs := readPrefs()
+
+	if err := os.MkdirAll(prefs.LogDir, 0755); err != nil {
+		log.Fatal(err)
+	}
+
+	logPath := filepath.Join(prefs.LogDir, "p4-debug.log")
 
 	args := os.Args[1:]
 	verboseArgs := append([]string{"-v", "4"}, args...)
 
 	start := time.Now()
-	cmd := exec.Command(realP4(), verboseArgs...)
+	cmd := exec.Command(prefs.P4Path, verboseArgs...)
 	duration := int64(time.Since(start) / time.Millisecond)
 
 	code := 0
@@ -105,9 +160,28 @@ func main() {
 		code = getExitStatus(err)
 	}
 
-	extended := fmt.Sprintf(TEMPLATE, start.Format(time.RFC3339), strings.Join(args, " "), strings.Join(p4Envs(), "\n"), out, duration)
+	cwd, _ := os.Getwd()
+
+	extended := fmt.Sprintf(TEMPLATE, start.Format(time.RFC3339), strings.Join(args, " "), cwd, strings.Join(p4Envs(), "\n"), out, duration)
 	writeToLog(logPath, extended)
 
-	fmt.Printf("%s\n", out)
+	if prefs.MaxLines > 0 {
+		lines := strings.Split(string(out), "\n")
+		limit := prefs.MaxLines
+
+		if limit > len(lines) {
+			limit = len(lines)
+		} else {
+			if len(lines) > 0 && limit != len(lines) {
+				lines[0] = fmt.Sprintf("[TRUNCATED OUTPUT - %d lines]\n\n%s", limit, lines[0])
+			}
+		}
+
+		truncated := strings.Join(lines[:limit], "\n")
+		fmt.Printf("%s\n", truncated)
+	} else {
+		fmt.Printf("%s\n", out)
+	}
+
 	os.Exit(code)
 }
