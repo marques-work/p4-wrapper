@@ -2,7 +2,7 @@
 
 This is a configurable wrapper for the `p4` executable that offers the following capabilities:
 
-  - Works in Windows, Linux, MacOS X
+  - Works on Windows, Linux, and MacOS X
   - Adds (very) verbose output to each `p4` command
   - Logs the environment, time, duration, and exit status
   - Optional output truncation to STDOUT (the log file retains the full content)
