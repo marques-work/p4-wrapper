@@ -137,6 +137,14 @@ func writeToLog(filename, text string) {
 	}
 }
 
+func lineEndings(s string) string {
+	if runtime.GOOS == "windows" {
+		re := regexp.MustCompile("\n")
+		s = re.ReplaceAllString(s, "\r\n")
+	}
+	return s
+}
+
 func main() {
 	prefs := readPrefs()
 
@@ -162,7 +170,7 @@ func main() {
 
 	cwd, _ := os.Getwd()
 
-	extended := fmt.Sprintf(TEMPLATE, start.Format(time.RFC3339), strings.Join(args, " "), cwd, strings.Join(p4Envs(), "\n"), out, duration)
+	extended := fmt.Sprintf(lineEndings(TEMPLATE), start.Format(time.RFC3339), strings.Join(args, " "), cwd, strings.Join(p4Envs(), "\n"), out, duration)
 	writeToLog(logPath, extended)
 
 	if prefs.MaxLines > 0 {
