@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"os"
@@ -31,6 +32,8 @@ P4 Environment:
 Full Output:
 
 %s
+
+Exit Status: %d
 
 Exec Time: %d ms
 `
@@ -159,6 +162,22 @@ func main() {
 
 	start := time.Now()
 	cmd := exec.Command(prefs.P4Path, verboseArgs...)
+	cmd.Env = os.Environ()
+
+	if stdin, err := cmd.StdinPipe(); err != nil {
+		log.Fatal(err)
+	} else {
+		go func() {
+			defer stdin.Close()
+
+			if data, ioerr := ioutil.ReadAll(os.Stdin); ioerr == nil {
+				io.WriteString(stdin, string(data))
+			} else {
+				log.Fatal(ioerr)
+			}
+		}()
+	}
+
 	duration := int64(time.Since(start) / time.Millisecond)
 
 	code := 0
@@ -170,7 +189,7 @@ func main() {
 
 	cwd, _ := os.Getwd()
 
-	extended := fmt.Sprintf(lineEndings(TEMPLATE), start.Format(time.RFC3339), strings.Join(args, " "), cwd, lineEndings(strings.Join(p4Envs(), "\n")), out, duration)
+	extended := fmt.Sprintf(lineEndings(TEMPLATE), start.Format(time.RFC3339), strings.Join(args, " "), cwd, lineEndings(strings.Join(p4Envs(), "\n")), out, code, duration)
 	writeToLog(logPath, extended)
 
 	if prefs.MaxLines > 0 {
