@@ -3,7 +3,7 @@
 This is a configurable wrapper for the `p4` executable that offers the following capabilities:
 
   - Works on Windows, Linux, and MacOS X
-  - Adds (very) verbose output to each `p4` command
+  - Adds (very) verbose output to each `p4` command (internally prepends `-v 4` to arguments)
   - Logs the environment, time, duration, and exit status
   - Optional output truncation to STDOUT (the log file retains the full content)
   - Is configurable via a `p4-wrapper.json` file in the CWD
