@@ -22,6 +22,7 @@ Configuration (optional if defaults are ok) is read from a `p4-wrapper.json` fil
 {
   "p4Path": "/usr/local/bin/p4", // "C:\Program Files\Perforce\p4.exe" on Windows
   "logDir": "/tmp", // "C:\tmp" on Windows
+  "verbose": false, // setting true adds `-v 4` to each command
   "maxLines": -1 // Any value > 0 will cause STDOUT to be truncated to the specified `maxLines`; a value of -1 yields the full output
 }
 ```
