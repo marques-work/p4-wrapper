@@ -42,6 +42,7 @@ type Prefs struct {
 	P4Path   string `json:"p4Path"`
 	LogDir   string `json:"logDir"`
 	MaxLines int    `json:"maxLines"`
+	Verbose  bool   `json:"verbose"`
 }
 
 func defaults() *Prefs {
@@ -56,11 +57,11 @@ func defaults() *Prefs {
 		LogDir = "/tmp"
 	}
 
-	return &Prefs{P4Path: P4Path, LogDir: LogDir, MaxLines: -1}
+	return &Prefs{P4Path: P4Path, LogDir: LogDir, MaxLines: -1, Verbose: false}
 }
 
 func readPrefs() *Prefs {
-	prefsFilePath := filepath.Join(thisDir(), "p4-wrapper.json")
+	prefsFilePath := filepath.Join(cwd(), "p4-wrapper.json")
 	def := defaults()
 
 	if _, err := os.Stat(prefsFilePath); os.IsNotExist(err) {
@@ -108,8 +109,8 @@ func p4Envs() []string {
 	})
 }
 
-func thisDir() string {
-	dir, err := filepath.Abs(filepath.Dir(os.Args[0]))
+func cwd() string {
+	dir, err := os.Getwd()
 
 	if err != nil {
 		log.Fatal(err)
@@ -158,10 +159,13 @@ func main() {
 	logPath := filepath.Join(prefs.LogDir, "p4-debug.log")
 
 	args := os.Args[1:]
-	verboseArgs := append([]string{"-v", "4"}, args...)
+
+	if prefs.Verbose {
+		args = append([]string{"-v", "4"}, args...)
+	}
 
 	start := time.Now()
-	cmd := exec.Command(prefs.P4Path, verboseArgs...)
+	cmd := exec.Command(prefs.P4Path, args...)
 	cmd.Env = os.Environ()
 
 	if stdin, err := cmd.StdinPipe(); err != nil {
@@ -187,9 +191,7 @@ func main() {
 		code = getExitStatus(err)
 	}
 
-	cwd, _ := os.Getwd()
-
-	extended := fmt.Sprintf(lineEndings(TEMPLATE), start.Format(time.RFC3339), strings.Join(args, " "), cwd, lineEndings(strings.Join(p4Envs(), "\n")), out, code, duration)
+	extended := fmt.Sprintf(lineEndings(TEMPLATE), start.Format(time.RFC3339), strings.Join(args, " "), cwd(), lineEndings(strings.Join(p4Envs(), "\n")), out, code, duration)
 	writeToLog(logPath, extended)
 
 	if prefs.MaxLines > 0 {
@@ -198,10 +200,6 @@ func main() {
 
 		if limit > len(lines) {
 			limit = len(lines)
-		} else {
-			if len(lines) > 0 && limit != len(lines) {
-				lines[0] = fmt.Sprintf("[TRUNCATED OUTPUT - %d lines]\n\n%s", limit, lines[0])
-			}
 		}
 
 		truncated := strings.Join(lines[:limit], "\n")
