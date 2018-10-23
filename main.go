@@ -182,10 +182,10 @@ func main() {
 		}()
 	}
 
-	duration := int64(time.Since(start) / time.Millisecond)
-
 	code := 0
 	out, err := cmd.CombinedOutput()
+
+	duration := int64(time.Since(start) / time.Millisecond)
 
 	if err != nil {
 		code = getExitStatus(err)
